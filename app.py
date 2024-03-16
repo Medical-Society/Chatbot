@@ -6,7 +6,7 @@ import json , os
 app = Flask(__name__)
 CORS(app)
 
-with open('config.json', 'r') as f:
+with open('Chatbot\config.json', 'r') as f:
     config = json.load(f)
 API_KEY = config['API_KEY']
 
@@ -26,15 +26,16 @@ Format any lists on individual lines with a dash and a space in front of each li
 try to make your answers small please and organized
 """
 
-
+user_reply = ""
+Ai_reply = ""
 previous_messages = []
 @app.route('/message', methods=['POST'])
 def process_message():
     try:
         req_data = request.get_json()
         print("Request Data:", req_data) 
-        
-        previous_messages.append(req_data['message'])
+        user_reply = "User: " + req_data['message']
+        previous_messages.append(user_reply)
        
         context = "\n".join(previous_messages)
         
@@ -48,9 +49,9 @@ def process_message():
         
         response = openai.chat.completions.create(**payload)
         
-        
         message_content = response.choices[0].message.content
-        
+        Ai_reply = "AI: " + message_content
+        previous_messages.append(Ai_reply)
         message = {'message': message_content}
         
         return jsonify(message) , 200
