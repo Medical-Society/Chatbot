@@ -34,8 +34,8 @@ def process_message():
     try:
         req_data = request.get_json()
         print("Request Data:", req_data) 
-        user_reply = "User: " + req_data['message']
-        previous_messages.append(user_reply)
+        
+        previous_messages.append(req_data['message'])
        
         context = "\n".join(previous_messages)
         
@@ -50,8 +50,7 @@ def process_message():
         response = openai.chat.completions.create(**payload)
         
         message_content = response.choices[0].message.content
-        Ai_reply = "AI: " + message_content
-        previous_messages.append(Ai_reply)
+        
         message = {'message': message_content}
         
         return jsonify(message) , 200
