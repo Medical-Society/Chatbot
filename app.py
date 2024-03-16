@@ -6,7 +6,7 @@ import json , os
 app = Flask(__name__)
 CORS(app)
 
-with open('Chatbot\config.json', 'r') as f:
+with open('config.json', 'r') as f:
     config = json.load(f)
 API_KEY = config['API_KEY']
 
