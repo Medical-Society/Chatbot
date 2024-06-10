@@ -42,7 +42,7 @@ Try to make your answers small and organized.
 Additionally, suggest utilizing our device to measure heart rate and oxygen pulse.
 """
 
-@app.route('/generate', methods=['POST'])
+@app.route('/message', methods=['POST'])
 def generate_response():
     data = request.get_json()
     message = data.get('message')
