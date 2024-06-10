@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 import google.generativeai as genai
 from uuid import uuid4
+import re
 
 app = Flask(__name__)
 app.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
@@ -24,7 +25,6 @@ model = genai.GenerativeModel(
     # See https://ai.google.dev/gemini-api/docs/safety-settings
 )
 
-
 chat_sessions = {}
 
 @app.route('/')
@@ -42,6 +42,17 @@ Try to make your answers small and organized.
 Additionally, suggest utilizing our device to measure heart rate and oxygen pulse.
 """
 
+def format_response(text):
+    """Format the response text to be organized."""
+    # Format lists with dashes
+    text = re.sub(r'\n(\s*-\s)', r'\n- ', text)
+    # Ensure new lines for lists
+    text = re.sub(r'(\d+\.\s)', r'\n\1', text)
+    text = re.sub(r'(\n\s*-)', r'\n- ', text)
+    # Normalize multiple new lines
+    text = re.sub(r'\n{2,}', '\n\n', text)
+    return text.strip()
+
 @app.route('/message', methods=['POST'])
 def generate_response():
     data = request.get_json()
@@ -56,14 +67,14 @@ def generate_response():
 
     if user_id not in chat_sessions:
         chat_sessions[user_id] = model.start_chat(history=[{"role": "user", "parts": [{"text": prompt}]}])
+    
     try:
         chat_session = chat_sessions[user_id]
         response = chat_session.send_message({"role": "user", "parts": [{"text": message}]})
-        response_text = response.text 
+        response_text = format_response(response.text)  
         return jsonify({"response": response_text})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    
 
 if __name__ == '__main__':
     app.run()
