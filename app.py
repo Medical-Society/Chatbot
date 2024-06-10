@@ -1,76 +1,69 @@
-from openai import OpenAI
-from flask import Flask, request, jsonify, session
-from flask_cors import CORS
-import json
+from flask import Flask, request, jsonify
+import google.generativeai as genai
+from uuid import uuid4
 
 app = Flask(__name__)
-CORS(app)
-
-
 app.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
 
-with open('config.json', 'r') as f:
-    config = json.load(f)
-API_KEY = config['API_KEY']
+# Configure the Google AI SDK
+genai.configure(api_key="AIzaSyCjVPfXxpSS75Yj5l1jzY0HvBzhn66IO8E")
 
-openai = OpenAI(api_key=API_KEY)
+# Create the model
+generation_config = {
+    "temperature": 1,
+    "top_p": 0.95,
+    "top_k": 64,
+    "max_output_tokens": 8192,
+    "response_mime_type": "text/plain",
+}
+
+model = genai.GenerativeModel(
+    model_name="gemini-1.5-flash",
+    generation_config=generation_config,
+    # safety_settings = Adjust safety settings
+    # See https://ai.google.dev/gemini-api/docs/safety-settings
+)
+
+
+chat_sessions = {}
 
 @app.route('/')
 def index():
-    return 'Welcome to the Medical Health Assistant API with GPT-3 language model'
+    return 'Welcome to the Medical Health Assistant API with Geni language model'
 
-prompt = """You are an AI assistant that is an expert in medical health and is part of a hospital system called medical society system AI.
+prompt = """You are an AI assistant that is an expert in medical health and is part of a hospital system called Medical Society System AI.
 You know about symptoms and signs of various types of illnesses.
 You can provide expert advice on self-diagnosis options in the case where an illness can be treated using a home remedy and suggest doctor's specialization.
 If a query requires serious medical attention with a doctor, recommend them to book an appointment with our doctors.
 If you are asked a question that is not related to medical health, respond with "I'm sorry but your question is beyond my functionalities".
 Do not use external URLs or blogs to refer.
 Format any lists on individual lines with a dash and a space in front of each line.
-Try to make your answers small please and organized.
-Additionally,suggest utilizing our device to measure heart rate and oxygen pulse.
-
+Try to make your answers small and organized.
+Additionally, suggest utilizing our device to measure heart rate and oxygen pulse.
 """
 
-@app.route('/message', methods=['POST'])
-def process_message():
+@app.route('/generate', methods=['POST'])
+def generate_response():
+    data = request.get_json()
+    message = data.get('message')
+    user_id = data.get('user_id')
+    
+    if not message:
+        return jsonify({"error": "No message provided"}), 400
+    
+    if not user_id:
+        return jsonify({"error": "No user ID provided"}), 400
+
+    if user_id not in chat_sessions:
+        chat_sessions[user_id] = model.start_chat(history=[{"role": "user", "parts": [{"text": prompt}]}])
     try:
-        req_data = request.get_json()
-        print("Request Data:", req_data) 
-        user_id = req_data.get('user_id', None)
-    
-        if not user_id:
-            return jsonify({'error': 'User ID is required'}), 400
-        
-    
-        user_message = req_data['message']
-        
-        previous_messages = session.get(user_id, [])
-        
-        previous_messages.append(user_message)
-        
-        if len(previous_messages) > 5:
-            previous_messages = previous_messages[-5:]
-        
-        session[user_id] = previous_messages
-        
-        context = "\n".join(previous_messages)
-        
-        prompt_with_context = prompt + context
-        
-        payload = {
-            "messages": [{"role": "system", "content": prompt_with_context}, {"role": "user", "content": user_message}],
-            "model": "gpt-3.5-turbo",
-        }
-        
-        response = openai.chat.completions.create(**payload)
-        
-        ai_reply = response.choices[0].message.content
-        
-        message = {'message': ai_reply}
-        
-        return jsonify(message), 200
+        chat_session = chat_sessions[user_id]
+        response = chat_session.send_message({"role": "user", "parts": [{"text": message}]})
+        response_text = response.text 
+        return jsonify({"response": response_text})
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        return jsonify({"error": str(e)}), 500
+    
 
 if __name__ == '__main__':
     app.run()
