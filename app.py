@@ -1,35 +1,49 @@
+# from openai import AzureOpenAI
+
+# # gets the API Key from environment variable AZURE_OPENAI_API_KEY
+# client = AzureOpenAI(
+#     # https://learn.microsoft.com/azure/ai-services/openai/reference#rest-api-versioning
+#     api_version="2024-06-01",
+#     api_key="ec35a3c78358449b90cf1f3a11884b0e",
+#     # https://learn.microsoft.com/azure/cognitive-services/openai/how-to/create-resource?pivots=web-portal#create-a-resource
+#     azure_endpoint="https://mssaichat.openai.azure.com/",
+# )
+
+# completion = client.chat.completions.create(
+#     model="MSSChat", 
+#     messages=[
+#         {
+#             "role": "user",
+#             "content": "what is drugs in prescription : Rx maxicollin 30ml ",
+#         },
+#     ],
+# )
+# print(completion.choices[0].message.content)
+
+
 from flask import Flask, request, jsonify
-import google.generativeai as genai
-from uuid import uuid4
+from openai import AzureOpenAI
+import os
 import re
 
 app = Flask(__name__)
 app.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
 
-# Configure the Google AI SDK
-genai.configure(api_key="AIzaSyCjVPfXxpSS75Yj5l1jzY0HvBzhn66IO8E")
+# Configure the Azure OpenAI client
+api_key = os.getenv('AZURE_OPENAI_API_KEY', 'ec35a3c78358449b90cf1f3a11884b0e')  # Replace with your API key if not using environment variable
+azure_endpoint = "https://mssaichat.openai.azure.com/"
 
-# Create the model
-generation_config = {
-    "temperature": 1,
-    "top_p": 0.95,
-    "top_k": 64,
-    "max_output_tokens": 8192,
-    "response_mime_type": "text/plain",
-}
-
-model = genai.GenerativeModel(
-    model_name="gemini-1.5-flash",
-    generation_config=generation_config,
-    # safety_settings = Adjust safety settings
-    # See https://ai.google.dev/gemini-api/docs/safety-settings
+client = AzureOpenAI(
+    api_version="2024-06-01",
+    api_key=api_key,
+    azure_endpoint=azure_endpoint
 )
 
 chat_sessions = {}
 
 @app.route('/')
 def index():
-    return 'Welcome to the Medical Health Assistant API with Geni language model'
+    return 'Welcome to the Medical Health Assistant API with Azure OpenAI language model'
 
 prompt = """You are an AI assistant that is an expert in medical health and is part of a hospital system called Medical Society System AI.
 You know about symptoms and signs of various types of illnesses.
@@ -66,12 +80,18 @@ def generate_response():
         return jsonify({"error": "No user ID provided"}), 400
 
     if user_id not in chat_sessions:
-        chat_sessions[user_id] = model.start_chat(history=[{"role": "user", "parts": [{"text": prompt}]}])
+        chat_sessions[user_id] = [{"role": "system", "content": prompt}]
     
     try:
-        chat_session = chat_sessions[user_id]
-        response = chat_session.send_message({"role": "user", "parts": [{"text": message}]})
-        response_text = format_response(response.text)  
+        chat_history = chat_sessions[user_id]
+        chat_history.append({"role": "user", "content": message})
+        completion = client.chat.completions.create(
+            model="MSSChat", 
+            messages=chat_history,
+        )
+        response_text = format_response(completion.choices[0].message.content)
+        chat_history.append({"role": "assistant", "content": response_text})
+        chat_sessions[user_id] = chat_history
         return jsonify({"response": response_text})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
